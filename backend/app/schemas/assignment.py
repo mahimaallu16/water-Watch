@@ -8,6 +8,11 @@ class AssignmentCreate(BaseModel):
     instructions: Optional[str] = None
     priority: Optional[str] = "p3"
 
+class ReassignRequest(BaseModel):
+    incident_id: str
+    new_worker_id: str
+    instructions: Optional[str] = None
+
 class AssignmentUpdate(BaseModel):
     status: Optional[str] = None # accepted, in_progress, completed
     instructions: Optional[str] = None
@@ -80,4 +85,3 @@ class AssignmentOut(BaseModel):
 
     class Config:
         from_attributes = True
-

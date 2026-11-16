@@ -2,10 +2,10 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, UploadFile, File, Form, BackgroundTasks, status
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.schemas.report import ReportCreate, ReportOut, AdditionalEvidenceSubmit
-from app.schemas.common import MessageResponse
+from app.schemas.report import ReportCreate, ReportOut
+from app.schemas.audit import StatusHistoryOut
 from app.services.report_service import report_service
-from app.core.deps import get_current_user, require_citizen, require_any_authenticated
+from app.api.dependencies.auth import get_current_user, require_citizen, require_any_authenticated
 from app.models.user import User
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
@@ -23,10 +23,10 @@ def submit_report(
     landmark: Optional[str] = Form(None),
     images: List[UploadFile] = File(None),
     background_tasks: BackgroundTasks = None,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_any_authenticated),
     db: Session = Depends(get_db)
 ):
-    """Citizen: Submit a new water issue report with location coordinates and photographs."""
+    """Resident: Submit a new water issue report with GPS coordinates and optional photographs."""
     report_in = ReportCreate(
         title=title,
         category=category,
@@ -47,7 +47,7 @@ def submit_report(
         background_tasks=background_tasks
     )
 
-    return report_service.get_report_by_id(db, report.id)
+    return report_service.get_report_by_id(db, report.id, current_user=current_user)
 
 @router.get("/", response_model=List[dict])
 def list_reports(
@@ -59,9 +59,13 @@ def list_reports(
     current_user: User = Depends(require_any_authenticated),
     db: Session = Depends(get_db)
 ):
-    """List water reports with filtering. Citizens see their own reports if mine=True or role=citizen."""
+    """
+    List water reports.
+    Residents automatically only see their own reports.
+    Administrators and Workers can view all reports, or filter by mine=True.
+    """
     citizen_filter = None
-    if current_user.role == "citizen" or mine:
+    if current_user.role in ("citizen", "resident") or mine:
         citizen_filter = current_user.id
 
     reports, total = report_service.list_reports(
@@ -82,7 +86,7 @@ def get_nearby_reports(
     current_user: User = Depends(require_any_authenticated),
     db: Session = Depends(get_db)
 ):
-    """Citizen & Admin: View nearby reported water issues on map within radius."""
+    """View nearby reported water issues on map within geographical radius."""
     return report_service.get_nearby_reports(
         db=db,
         latitude=latitude,
@@ -96,8 +100,20 @@ def get_report(
     current_user: User = Depends(require_any_authenticated),
     db: Session = Depends(get_db)
 ):
-    """Get full details of a specific water report."""
-    return report_service.get_report_by_id(db, report_id)
+    """
+    Get full details of a specific water report.
+    Enforces server-side ownership: residents can only access their own reports.
+    """
+    return report_service.get_report_by_id(db, report_id, current_user=current_user)
+
+@router.get("/{report_id}/history", response_model=List[StatusHistoryOut])
+def get_report_history(
+    report_id: str,
+    current_user: User = Depends(require_any_authenticated),
+    db: Session = Depends(get_db)
+):
+    """Retrieve end-to-end status change history for a report."""
+    return report_service.get_report_status_history(db, report_id, current_user=current_user)
 
 @router.post("/{report_id}/evidence", response_model=dict)
 def submit_additional_evidence(
@@ -115,5 +131,4 @@ def submit_additional_evidence(
         images=images,
         notes=notes
     )
-    return report_service.get_report_by_id(db, report.id)
-
+    return report_service.get_report_by_id(db, report.id, current_user=current_user)

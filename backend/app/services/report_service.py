@@ -10,8 +10,10 @@ from app.schemas.report import ReportCreate, ReportOut, ReportImageOut, Duplicat
 from app.services.image_service import validate_and_save_image
 from app.services.audit_service import audit_service
 from app.tasks.background import execute_report_ai_analysis
-from app.ai.duplicate_detector import calculate_haversine_distance_meters
+from app.utils.geo import validate_coordinates, haversine_distance_meters
+from app.utils.status import validate_report_transition
 from app.core.exceptions import NotFoundException, ForbiddenException, BadRequestException
+from app.repositories.report_repository import report_repository
 
 class ReportService:
     @staticmethod
@@ -28,20 +30,23 @@ class ReportService:
         images: List[UploadFile] = None,
         background_tasks: BackgroundTasks = None
     ) -> Report:
+        # Strict validation of latitude and longitude coordinates
+        lat, lon = validate_coordinates(report_in.latitude, report_in.longitude)
+
         report_number = ReportService.generate_report_number(db)
 
         report = Report(
             citizen_id=citizen.id,
             report_number=report_number,
-            title=report_in.title,
-            category=report_in.category,
-            description=report_in.description,
+            title=report_in.title.strip(),
+            category=report_in.category.strip().lower(),
+            description=report_in.description.strip(),
             estimated_flow=report_in.estimated_flow or "moderate_stream",
-            affected_households=report_in.affected_households or 1,
-            latitude=report_in.latitude,
-            longitude=report_in.longitude,
-            address_text=report_in.address_text,
-            landmark=report_in.landmark,
+            affected_households=max(1, report_in.affected_households or 1),
+            latitude=lat,
+            longitude=lon,
+            address_text=report_in.address_text.strip(),
+            landmark=report_in.landmark.strip() if report_in.landmark else None,
             status="submitted"
         )
         db.add(report)
@@ -50,9 +55,10 @@ class ReportService:
         # Handle uploaded photographs
         if images:
             for idx, img_file in enumerate(images):
-                if img_file.filename:
+                if img_file and img_file.filename:
                     rel_url, size, w, h = validate_and_save_image(img_file, subfolder="reports")
-                    img_record = ReportImage(
+                    report_repository.add_image(
+                        db=db,
                         report_id=report.id,
                         image_url=rel_url,
                         file_name=img_file.filename,
@@ -62,7 +68,6 @@ class ReportService:
                         height=h,
                         is_primary=(idx == 0)
                     )
-                    db.add(img_record)
 
         db.commit()
         db.refresh(report)
@@ -95,13 +100,19 @@ class ReportService:
         return report
 
     @staticmethod
-    def get_report_by_id(db: Session, report_id: str) -> dict:
-        report = db.query(Report).filter(Report.id == report_id).first()
+    def get_report_by_id(db: Session, report_id: str, current_user: Optional[User] = None) -> dict:
+        report = report_repository.get(db, report_id)
         if not report:
             raise NotFoundException("Report", report_id)
 
+        # Server-side ownership enforcement:
+        # A resident can only access their own reports
+        if current_user and current_user.role in ("citizen", "resident"):
+            if report.citizen_id != current_user.id:
+                raise ForbiddenException("Residents can only access their own reports")
+
         citizen = db.query(User).filter(User.id == report.citizen_id).first()
-        link = db.query(ReportIncidentLink).filter(ReportIncidentLink.report_id == report.id).first()
+        link = report_repository.get_incident_link(db, report.id)
         
         linked_inc = None
         if link:
@@ -145,16 +156,14 @@ class ReportService:
         skip: int = 0,
         limit: int = 50
     ) -> Tuple[List[dict], int]:
-        q = db.query(Report)
-        if citizen_id:
-            q = q.filter(Report.citizen_id == citizen_id)
-        if status:
-            q = q.filter(Report.status == status)
-        if category:
-            q = q.filter(Report.category == category)
-            
-        total = q.count()
-        reports = q.order_by(Report.created_at.desc()).offset(skip).limit(limit).all()
+        reports, total = report_repository.filter_reports(
+            db=db,
+            citizen_id=citizen_id,
+            status=status,
+            category=category,
+            skip=skip,
+            limit=limit
+        )
 
         results = []
         for r in reports:
@@ -168,19 +177,19 @@ class ReportService:
         longitude: float,
         radius_km: float = 5.0
     ) -> List[dict]:
+        validate_coordinates(latitude, longitude)
         reports = db.query(Report).filter(
             Report.status.in_(["submitted", "under_review", "linked", "resolved"])
         ).all()
 
         nearby = []
         for r in reports:
-            dist_m = calculate_haversine_distance_meters(latitude, longitude, r.latitude, r.longitude)
+            dist_m = haversine_distance_meters(latitude, longitude, r.latitude, r.longitude)
             if (dist_m / 1000.0) <= radius_km:
                 rep_data = ReportService.get_report_by_id(db, r.id)
                 rep_data["distance_km"] = round(dist_m / 1000.0, 2)
                 nearby.append(rep_data)
 
-        # Sort by distance
         nearby.sort(key=lambda x: x["distance_km"])
         return nearby
 
@@ -192,19 +201,21 @@ class ReportService:
         images: List[UploadFile] = None,
         notes: Optional[str] = None
     ) -> Report:
-        report = db.query(Report).filter(Report.id == report_id).first()
+        report = report_repository.get(db, report_id)
         if not report:
             raise NotFoundException("Report", report_id)
 
-        # Must be report owner or admin
-        if user.role != "admin" and report.citizen_id != user.id:
-            raise ForbiddenException("You cannot modify evidence for this report")
+        # Server-side ownership enforcement:
+        # Resident can only submit evidence to their own reports
+        if user.role in ("citizen", "resident") and report.citizen_id != user.id:
+            raise ForbiddenException("You cannot add evidence to another resident's report")
 
         if images:
             for img_file in images:
-                if img_file.filename:
+                if img_file and img_file.filename:
                     rel_url, size, w, h = validate_and_save_image(img_file, subfolder="reports")
-                    img_record = ReportImage(
+                    report_repository.add_image(
+                        db=db,
                         report_id=report.id,
                         image_url=rel_url,
                         file_name=img_file.filename,
@@ -214,7 +225,6 @@ class ReportService:
                         height=h,
                         is_primary=False
                     )
-                    db.add(img_record)
 
         if notes:
             report.description += f"\n\n[Additional Note ({datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}]: {notes}"
@@ -232,5 +242,16 @@ class ReportService:
         )
         return report
 
-report_service = ReportService()
+    @staticmethod
+    def get_report_status_history(db: Session, report_id: str, current_user: User) -> List[dict]:
+        report = report_repository.get(db, report_id)
+        if not report:
+            raise NotFoundException("Report", report_id)
 
+        # Ownership check
+        if current_user.role in ("citizen", "resident") and report.citizen_id != current_user.id:
+            raise ForbiddenException("Residents can only access history of their own reports")
+
+        return audit_service.get_status_history(db, "report", report.id)
+
+report_service = ReportService()

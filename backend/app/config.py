@@ -1,8 +1,10 @@
 import os
 from typing import List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict
 
 class Settings(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     PROJECT_NAME: str = "WaterWatch"
     VERSION: str = "1.0.0"
     API_V1_PREFIX: str = "/api/v1"
@@ -44,9 +46,5 @@ class Settings(BaseModel):
     AI_CONFIDENCE_THRESHOLD: float = 0.65
     DUPLICATE_DISTANCE_METERS: float = 250.0 # 250m radius
     DUPLICATE_TIME_WINDOW_HOURS: float = 72.0 # 72 hours
-    
-    class Config:
-        arbitrary_types_allowed = True
 
 settings = Settings()
-
