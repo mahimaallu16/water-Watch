@@ -7,10 +7,10 @@ from sqlalchemy.orm import Session
 from app.models.user import User, WorkerProfile
 from app.models.assignment import Assignment
 from app.schemas.team import TeamCreate, TeamOut, TeamMemberOut, WorkerRegisterByAdmin
-from app.services.auth_service import auth_service
-from app.schemas.user import UserRegister
+from app.core.security import hash_password
 from app.core.exceptions import BadRequestException, ConflictException
 from app.services.audit_service import audit_service
+from app.repositories.user_repository import user_repository
 
 # In-memory storage of custom team configurations if extended beyond standard zones
 _MUNICIPAL_TEAMS: Dict[str, Dict[str, Any]] = {
@@ -125,23 +125,37 @@ class TeamService:
     @staticmethod
     def register_worker(db: Session, worker_in: WorkerRegisterByAdmin, admin: User) -> User:
         """Administrator: Register a field technician into an operational team and zone."""
-        reg_schema = UserRegister(
-            email=worker_in.email,
-            password=worker_in.password,
-            full_name=worker_in.full_name,
-            phone=worker_in.phone,
-            role="worker",
-            employee_id=worker_in.employee_id,
-            department=worker_in.department,
-            zone=worker_in.zone,
-            specialization=worker_in.specialization
-        )
-        worker = auth_service.register_user(db, reg_schema)
+        existing = user_repository.get_by_email(db, worker_in.email)
+        if existing:
+            raise ConflictException(f"User with email '{worker_in.email}' already exists.")
 
-        if worker_in.max_active_tasks and worker.worker_profile:
-            worker.worker_profile.max_active_tasks = worker_in.max_active_tasks
-            db.commit()
-            db.refresh(worker)
+        if not worker_in.password or len(worker_in.password) < 8:
+            raise BadRequestException("Password must be at least 8 characters long.")
+
+        worker = User(
+            email=worker_in.email.strip().lower(),
+            password_hash=hash_password(worker_in.password),
+            full_name=worker_in.full_name.strip(),
+            phone=worker_in.phone.strip() if worker_in.phone else None,
+            role="worker",
+            is_active=True
+        )
+        db.add(worker)
+        db.flush()
+
+        emp_id = worker_in.employee_id or f"WKR-{worker.id[:8].upper()}"
+        prof = WorkerProfile(
+            user_id=worker.id,
+            employee_id=emp_id,
+            department=worker_in.department or "Water Operations",
+            zone=worker_in.zone or "Central",
+            specialization=worker_in.specialization or "General Plumbing",
+            max_active_tasks=worker_in.max_active_tasks or 5,
+            is_available=True
+        )
+        db.add(prof)
+        db.commit()
+        db.refresh(worker)
 
         audit_service.log_action(
             db=db,
@@ -159,4 +173,3 @@ class TeamService:
         return worker
 
 team_service = TeamService()
-

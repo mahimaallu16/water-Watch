@@ -85,3 +85,4 @@ python -m pytest backend/tests -v
 | **Administrator** | `admin@waterwatch.org` | `Password123!` | Work order creation, AI duplicate review, technician dispatch, repair verification, analytics |
 | **Field Worker** | `worker@waterwatch.org` | `Password123!` | Field dispatches, arrival updates, photo evidence upload, completion submission |
 | **Resident / Citizen** | `citizen@waterwatch.org` | `Password123!` | Leak reporting, map GPS location selection, progress tracking, nearby reports map |
+

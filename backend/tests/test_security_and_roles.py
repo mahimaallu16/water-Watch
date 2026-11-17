@@ -41,6 +41,17 @@ def test_registration_and_duplicate_email(db):
         auth_service.register_user(db, reg_data)
     assert "already exists" in str(exc.value)
 
+def test_self_registration_blocks_admin_escalation(db):
+    reg_admin = UserRegister(
+        email=f"hacker_{datetime.now(timezone.utc).microsecond}@example.com",
+        password="HackerPassword123!",
+        full_name="Malicious Actor",
+        role="admin"
+    )
+    with pytest.raises(BadRequestException) as exc:
+        auth_service.register_user(db, reg_admin)
+    assert "only available for Residents" in str(exc.value)
+
 def test_login_invalid_password(db):
     creds = UserLogin(email="admin@waterwatch.org", password="WrongPassword!")
     with pytest.raises(UnauthorizedException):
@@ -50,7 +61,6 @@ def test_role_restrictions_resident_cannot_pass_admin_dependency(db):
     citizen = db.query(User).filter(User.role == "citizen").first()
     assert citizen is not None
 
-    # Resident attempting to execute admin-protected logic
     with pytest.raises(ForbiddenException) as exc:
         require_admin(citizen)
     assert "requires one of roles: admin" in str(exc.value)
@@ -104,18 +114,21 @@ def test_worker_assignment_ownership_enforcement(db):
     w1_user = db.query(User).filter(User.role == "worker").first()
     assert w1_user is not None
 
-    # Worker 2
+    admin = db.query(User).filter(User.role == "admin").first()
+
+    # Worker 2 registered through admin team workflow
+    from app.services.team_service import team_service
+    from app.schemas.team import WorkerRegisterByAdmin
     w2_email = f"worker2_{datetime.now(timezone.utc).microsecond}@waterwatch.org"
-    w2_user = auth_service.register_user(db, UserRegister(
+    w2_user = team_service.register_worker(db, WorkerRegisterByAdmin(
         email=w2_email,
         password="Password123!",
         full_name="Second Field Worker",
-        role="worker",
-        employee_id=f"WKR-{datetime.now(timezone.utc).microsecond}"
-    ))
+        employee_id=f"WKR-{datetime.now(timezone.utc).microsecond}",
+        zone="Central"
+    ), admin)
 
     # Admin creates assignment for Worker 1
-    admin = db.query(User).filter(User.role == "admin").first()
     inc = Incident(
         incident_number=f"INC-OWN-{datetime.now(timezone.utc).microsecond}",
         title="Ownership Test Incident",

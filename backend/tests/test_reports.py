@@ -54,7 +54,24 @@ def test_create_and_fetch_report(db):
     assert fetched["citizen_name"] == citizen.full_name
 
 def test_get_nearby_reports(db):
+    citizen = db.query(User).filter(User.role == "citizen").first()
+    assert citizen is not None
+
+    # Ensure a report exists nearby
+    nearby_existing = report_service.get_nearby_reports(db, latitude=12.9718, longitude=77.5948, radius_km=5.0)
+    if not nearby_existing:
+        rep_in = ReportCreate(
+            title="Nearby Test Report",
+            category="pipe_leak",
+            description="Nearby leak test",
+            estimated_flow="moderate_stream",
+            affected_households=2,
+            latitude=12.9720,
+            longitude=77.5950,
+            address_text="Market Street"
+        )
+        report_service.create_report(db, rep_in, citizen)
+
     nearby = report_service.get_nearby_reports(db, latitude=12.9718, longitude=77.5948, radius_km=5.0)
     assert len(nearby) > 0
     assert "distance_km" in nearby[0]
-
