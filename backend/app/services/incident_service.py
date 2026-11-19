@@ -9,7 +9,11 @@ from app.schemas.incident import IncidentCreate, IncidentUpdate
 from app.services.audit_service import audit_service
 from app.services.notification_service import notification_service
 from app.services.report_service import report_service
+from app.utils.geo import validate_coordinates
+from app.utils.status import validate_incident_transition
 from app.core.exceptions import NotFoundException, BadRequestException, ConflictException
+from app.repositories.incident_repository import incident_repository
+from app.repositories.report_repository import report_repository
 
 class IncidentService:
     @staticmethod
@@ -20,19 +24,31 @@ class IncidentService:
 
     @staticmethod
     def create_incident(db: Session, inc_in: IncidentCreate, admin: User) -> Incident:
+        # Validate coordinates
+        lat, lon = validate_coordinates(inc_in.latitude, inc_in.longitude)
+
+        # Validate severity and priority values
+        severity = inc_in.severity.strip().lower()
+        if severity not in ("low", "medium", "high", "critical"):
+            raise BadRequestException(f"Invalid severity '{inc_in.severity}'. Must be low, medium, high, or critical.")
+
+        priority = inc_in.priority.strip().lower()
+        if priority not in ("p1", "p2", "p3", "p4"):
+            raise BadRequestException(f"Invalid priority '{inc_in.priority}'. Must be p1, p2, p3, or p4.")
+
         inc_number = IncidentService.generate_incident_number(db)
 
         incident = Incident(
             incident_number=inc_number,
-            title=inc_in.title,
-            category=inc_in.category,
-            description=inc_in.description,
-            severity=inc_in.severity,
-            priority=inc_in.priority,
+            title=inc_in.title.strip(),
+            category=inc_in.category.strip().lower(),
+            description=inc_in.description.strip(),
+            severity=severity,
+            priority=priority,
             status="investigating",
-            latitude=inc_in.latitude,
-            longitude=inc_in.longitude,
-            address_text=inc_in.address_text,
+            latitude=lat,
+            longitude=lon,
+            address_text=inc_in.address_text.strip(),
             zone=inc_in.zone or "Central",
             created_by=admin.id,
             target_resolution_at=inc_in.target_resolution_at
@@ -63,7 +79,7 @@ class IncidentService:
             }
         )
 
-        # If an initial report was selected to create this incident
+        # If an initial report was selected to create this incident, link in same transaction
         if inc_in.initial_report_id:
             IncidentService.link_report(
                 db=db,
@@ -85,26 +101,30 @@ class IncidentService:
         admin: User,
         notes: Optional[str] = None
     ) -> ReportIncidentLink:
-        incident = db.query(Incident).filter(Incident.id == incident_id).first()
+        """
+        Links a citizen report to an incident using database transaction isolation.
+        Supports 1-to-N: one incident may have multiple linked reports.
+        """
+        incident = incident_repository.get(db, incident_id)
         if not incident:
             raise NotFoundException("Incident", incident_id)
 
-        report = db.query(Report).filter(Report.id == report_id).first()
+        report = report_repository.get(db, report_id)
         if not report:
             raise NotFoundException("Report", report_id)
 
         # Check if already linked
-        existing_link = db.query(ReportIncidentLink).filter(ReportIncidentLink.report_id == report_id).first()
+        existing_link = report_repository.get_incident_link(db, report_id)
         if existing_link:
             raise ConflictException(f"Report is already linked to incident id: {existing_link.incident_id}")
 
-        link = ReportIncidentLink(
+        link = incident_repository.link_report(
+            db=db,
             incident_id=incident.id,
             report_id=report.id,
             linked_by=admin.id,
             notes=notes
         )
-        db.add(link)
 
         # Update report status to linked
         old_report_status = report.status
@@ -150,7 +170,7 @@ class IncidentService:
         inc_update: IncidentUpdate,
         admin: User
     ) -> Incident:
-        incident = db.query(Incident).filter(Incident.id == incident_id).first()
+        incident = incident_repository.get(db, incident_id)
         if not incident:
             raise NotFoundException("Incident", incident_id)
 
@@ -167,22 +187,29 @@ class IncidentService:
         if inc_update.description is not None:
             incident.description = inc_update.description
         if inc_update.severity is not None:
-            incident.severity = inc_update.severity
+            sev = inc_update.severity.strip().lower()
+            if sev not in ("low", "medium", "high", "critical"):
+                raise BadRequestException(f"Invalid severity '{inc_update.severity}'")
+            incident.severity = sev
         if inc_update.priority is not None:
-            incident.priority = inc_update.priority
+            prio = inc_update.priority.strip().lower()
+            if prio not in ("p1", "p2", "p3", "p4"):
+                raise BadRequestException(f"Invalid priority '{inc_update.priority}'")
+            incident.priority = prio
         if inc_update.zone is not None:
             incident.zone = inc_update.zone
         if inc_update.target_resolution_at is not None:
             incident.target_resolution_at = inc_update.target_resolution_at
 
-        # Status transition check
+        # Status transition validation
         if inc_update.status is not None and inc_update.status != incident.status:
+            new_st = validate_incident_transition(incident.status, inc_update.status)
             prev_status = incident.status
-            incident.status = inc_update.status
+            incident.status = new_st
             
-            if inc_update.status == "resolved" and not incident.resolved_at:
+            if new_st == "resolved" and not incident.resolved_at:
                 incident.resolved_at = datetime.now(timezone.utc)
-            elif inc_update.status == "closed" and not incident.closed_at:
+            elif new_st == "closed" and not incident.closed_at:
                 incident.closed_at = datetime.now(timezone.utc)
 
             audit_service.record_status_change(
@@ -192,7 +219,7 @@ class IncidentService:
                 new_status=incident.status,
                 previous_status=prev_status,
                 changed_by=admin.id,
-                notes=f"Incident status changed to {incident.status}"
+                notes=f"Incident status transitioned from {prev_status} to {incident.status}"
             )
 
         db.commit()
@@ -211,12 +238,12 @@ class IncidentService:
 
     @staticmethod
     def get_incident_detail(db: Session, incident_id: str) -> dict:
-        incident = db.query(Incident).filter(Incident.id == incident_id).first()
+        incident = incident_repository.get(db, incident_id)
         if not incident:
             raise NotFoundException("Incident", incident_id)
 
-        # Linked reports
-        links = db.query(ReportIncidentLink).filter(ReportIncidentLink.incident_id == incident.id).all()
+        # Linked reports (N reports -> 1 incident)
+        links = incident_repository.get_linked_reports(db, incident.id)
         linked_reports = [report_service.get_report_by_id(db, l.report_id) for l in links]
 
         # Assignments
@@ -299,23 +326,26 @@ class IncidentService:
         skip: int = 0,
         limit: int = 50
     ) -> Tuple[List[dict], int]:
-        q = db.query(Incident)
-        if status:
-            q = q.filter(Incident.status == status)
-        if severity:
-            q = q.filter(Incident.severity == severity)
-        if priority:
-            q = q.filter(Incident.priority == priority)
-        if zone:
-            q = q.filter(Incident.zone == zone)
-
-        total = q.count()
-        incidents = q.order_by(Incident.created_at.desc()).offset(skip).limit(limit).all()
+        incidents, total = incident_repository.filter_incidents(
+            db=db,
+            status=status,
+            severity=severity,
+            priority=priority,
+            zone=zone,
+            skip=skip,
+            limit=limit
+        )
 
         results = []
         for inc in incidents:
             results.append(IncidentService.get_incident_detail(db, inc.id))
         return results, total
 
-incident_service = IncidentService()
+    @staticmethod
+    def get_incident_status_history(db: Session, incident_id: str) -> List[dict]:
+        incident = incident_repository.get(db, incident_id)
+        if not incident:
+            raise NotFoundException("Incident", incident_id)
+        return audit_service.get_status_history(db, "incident", incident.id)
 
+incident_service = IncidentService()

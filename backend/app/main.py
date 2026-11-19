@@ -11,6 +11,8 @@ from app.database import engine, Base
 from app.models import *
 from app.api.v1.router import api_router
 from app.core.exceptions import AppException
+from app.middleware.security import SecurityHeadersMiddleware
+from app.middleware.timing import TimingMiddleware
 from app.db.seed import seed_database
 
 @asynccontextmanager
@@ -34,6 +36,10 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+# Defensive Middleware (Timing & OWASP Security Headers)
+app.add_middleware(TimingMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
+
 # CORS Middleware
 app.add_middleware(
     CORSMiddleware,
@@ -43,10 +49,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Static file serving for uploads
+# Static file serving for uploads (Restricted to uploads directory)
 upload_dir_path = os.path.abspath(settings.UPLOAD_DIR)
 if not os.path.exists(upload_dir_path):
-    # Check if inside backend/uploads
     backend_upload = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", settings.UPLOAD_DIR))
     if os.path.exists(backend_upload):
         upload_dir_path = backend_upload
@@ -78,9 +83,10 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 async def unhandled_exception_handler(request: Request, exc: Exception):
     import traceback
     traceback.print_exc()
+    # Secure error response: Never leak internal error traces or database secrets to users
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"message": "An unexpected internal server error occurred", "code": "INTERNAL_SERVER_ERROR", "detail": str(exc)}
+        content={"message": "An unexpected internal server error occurred", "code": "INTERNAL_SERVER_ERROR"}
     )
 
 # Include v1 API router
@@ -93,7 +99,7 @@ def root():
         "version": settings.VERSION,
         "status": "online",
         "docs": "/docs",
-        "portals": ["Citizen", "Administrator", "Field Worker"]
+        "portals": ["Resident", "Administrator", "Field Worker"]
     }
 
 @app.get("/api/health", tags=["Health"])
@@ -107,4 +113,3 @@ def health_check():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
-

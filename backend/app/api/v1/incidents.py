@@ -3,8 +3,9 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.incident import IncidentCreate, IncidentUpdate, IncidentOut, IncidentDetailOut, ReportIncidentLinkCreate
+from app.schemas.audit import StatusHistoryOut
 from app.services.incident_service import incident_service
-from app.core.deps import get_current_user, require_admin, require_any_authenticated
+from app.api.dependencies.auth import get_current_user, require_admin, require_any_authenticated
 from app.models.user import User
 
 router = APIRouter(prefix="/incidents", tags=["Incidents"])
@@ -15,7 +16,7 @@ def create_incident(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Administrator: Create an incident and optionally link an initial report."""
+    """Administrator: Create an incident work order and optionally link an initial report."""
     incident = incident_service.create_incident(db, inc_in, current_user)
     return incident_service.get_incident_detail(db, incident.id)
 
@@ -51,6 +52,15 @@ def get_incident(
     """Get complete details of an incident including linked reports and evidence."""
     return incident_service.get_incident_detail(db, incident_id)
 
+@router.get("/{incident_id}/history", response_model=List[StatusHistoryOut])
+def get_incident_history(
+    incident_id: str,
+    current_user: User = Depends(require_any_authenticated),
+    db: Session = Depends(get_db)
+):
+    """Retrieve end-to-end lifecycle status change history for an incident."""
+    return incident_service.get_incident_status_history(db, incident_id)
+
 @router.put("/{incident_id}", response_model=dict)
 def update_incident(
     incident_id: str,
@@ -69,7 +79,7 @@ def link_report_to_incident(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Administrator: Link a citizen report to an incident."""
+    """Administrator: Link a citizen report to an existing incident."""
     incident_service.link_report(
         db=db,
         incident_id=incident_id,
@@ -78,4 +88,3 @@ def link_report_to_incident(
         notes=link_in.notes
     )
     return incident_service.get_incident_detail(db, incident_id)
-

@@ -17,7 +17,7 @@ export default function NewReport() {
   const [affectedHouseholds, setAffectedHouseholds] = useState(1);
   const [latitude, setLatitude] = useState(12.9716);
   const [longitude, setLongitude] = useState(77.5946);
-  const [addressText, setAddressText] = useState('5th Avenue & Market Street');
+  const [addressText, setAddressText] = useState('');
   const [landmark, setLandmark] = useState('');
   const [selectedImages, setSelectedImages] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
