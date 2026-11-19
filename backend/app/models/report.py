@@ -29,6 +29,7 @@ class Report(Base):
     ai_suggestions = relationship("AISuggestion", back_populates="report", cascade="all, delete-orphan", foreign_keys="AISuggestion.report_id")
     duplicate_candidates = relationship("DuplicateCandidate", back_populates="report", foreign_keys="DuplicateCandidate.report_id", cascade="all, delete-orphan")
     incident_link = relationship("ReportIncidentLink", back_populates="report", uselist=False)
+    feedback = relationship("CitizenFeedback", back_populates="report", uselist=False, cascade="all, delete-orphan")
 
 class ReportImage(Base):
     __tablename__ = "report_images"
