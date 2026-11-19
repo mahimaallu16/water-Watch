@@ -1,0 +1,35 @@
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# Environment variables
+.env
+.env.*
+
+# Node dependencies
+node_modules/
+frontend/node_modules/
+
+# Build files
+dist/
+frontend/dist/
+
+# Local databases
+*.db
+
+# Uploaded files and evidence
+uploads/
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
