@@ -124,6 +124,17 @@ class ReportService:
             ReportImageOut.model_validate(img) for img in report.images
         ]
 
+        feedback_out = None
+        if report.feedback:
+            feedback_out = {
+                "id": report.feedback.id,
+                "rating": report.feedback.rating,
+                "satisfaction_category": report.feedback.satisfaction_category,
+                "comments": report.feedback.comments,
+                "created_at": report.feedback.created_at,
+                "updated_at": report.feedback.updated_at
+            }
+
         return {
             "id": report.id,
             "citizen_id": report.citizen_id,
@@ -144,7 +155,8 @@ class ReportService:
             "citizen_name": citizen.full_name if citizen else "Resident",
             "linked_incident_id": linked_inc.id if linked_inc else None,
             "linked_incident_number": linked_inc.incident_number if linked_inc else None,
-            "linked_incident_status": linked_inc.status if linked_inc else None
+            "linked_incident_status": linked_inc.status if linked_inc else None,
+            "feedback": feedback_out
         }
 
     @staticmethod

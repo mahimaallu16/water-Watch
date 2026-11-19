@@ -1,35 +1,35 @@
-
 # Python
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
+.Python
+backend/venv/
 venv/
-.venv/
+ENV/
+*.env
 
-# Environment variables
-.env
-.env.*
+# SQLite Databases (keep clean state in repo)
+# If team tracks demo db, don't ignore, but local changes shouldn't conflict
+*.db-journal
 
-# Node dependencies
+# Node & Frontend
 node_modules/
 frontend/node_modules/
-
-# Build files
+.vite/
+frontend/.vite/
 dist/
 frontend/dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Local databases
-*.db
+# Uploads / Media generated locally
+backend/uploads/*
+!backend/uploads/.gitkeep
 
-# Uploaded files and evidence
-uploads/
-
-# Logs
-*.log
-
-# IDE
+# IDEs & OS
 .vscode/
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
+.idea/
+.DS_Store
+Thumbs.db

@@ -12,7 +12,8 @@ import {
   Clock,
   Sparkles,
   Camera,
-  Layers
+  Layers,
+  Star
 } from 'lucide-react';
 import { reportService } from '../../services/reportService';
 import { aiService } from '../../services/aiService';
@@ -391,6 +392,44 @@ export default function ReportReviewDetail() {
                   </div>
                 ) : (
                   <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: 4 }}>No photographs uploaded.</p>
+                )}
+                {/* Citizen Satisfaction Feedback */}
+                {report.feedback && (
+                  <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: '0.5rem' }}>
+                      <Star size={18} fill="#eab308" color="#eab308" />
+                      <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#854d0e', textTransform: 'uppercase' }}>
+                        Citizen Satisfaction Review
+                      </span>
+                    </div>
+
+                    <div style={{ background: '#fefce8', padding: '1rem', borderRadius: '8px', border: '1px solid #fef08a' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <Star
+                            key={s}
+                            size={18}
+                            fill={s <= report.feedback.rating ? '#eab308' : 'none'}
+                            color={s <= report.feedback.rating ? '#eab308' : '#cbd5e1'}
+                          />
+                        ))}
+                        <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#854d0e', marginLeft: 6 }}>
+                          {report.feedback.rating} / 5 Stars
+                        </span>
+                        {report.feedback.satisfaction_category && (
+                          <span className="badge" style={{ backgroundColor: '#fef3c7', color: '#92400e', marginLeft: 8 }}>
+                            {report.feedback.satisfaction_category}
+                          </span>
+                        )}
+                      </div>
+
+                      {report.feedback.comments && (
+                        <p style={{ fontSize: '0.88rem', color: '#334155', marginTop: '0.5rem', fontStyle: 'italic', lineHeight: 1.4 }}>
+                          "{report.feedback.comments}"
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
