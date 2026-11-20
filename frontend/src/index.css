@@ -91,7 +91,7 @@ button, input, select, textarea {
   top: 0;
   bottom: 0;
   left: 0;
-  z-index: 40;
+  z-index: 1060;
   transition: transform 0.2s ease;
 }
 
@@ -233,7 +233,7 @@ button, input, select, textarea {
   padding: 0 2rem;
   position: sticky;
   top: 0;
-  z-index: 30;
+  z-index: 1050;
 }
 
 .page-container {
@@ -513,7 +513,7 @@ button, input, select, textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 2000;
   padding: 1rem;
 }
 
@@ -564,7 +564,7 @@ button, input, select, textarea {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  z-index: 150;
+  z-index: 2100;
 }
 
 .toast {

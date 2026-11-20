@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Bell, User, LogOut, CheckCheck } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Bell, User, LogOut, CheckCheck, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { notificationService } from '../../services/notificationService';
 import { formatRelativeTime } from '../../utils/formatters';
@@ -9,6 +9,7 @@ export default function Navbar({ portalTitle = 'WaterWatch Platform', onToggleSi
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifs, setShowNotifs] = useState(false);
+  const notifRef = useRef(null);
 
   const fetchNotifs = async () => {
     try {
@@ -27,6 +28,31 @@ export default function Navbar({ portalTitle = 'WaterWatch Platform', onToggleSi
     fetchNotifs();
     const interval = setInterval(fetchNotifs, 20000);
     return () => clearInterval(interval);
+  }, [showNotifs]);
+
+  // Close dropdown on outside click or Escape key
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setShowNotifs(false);
+      }
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setShowNotifs(false);
+      }
+    };
+
+    if (showNotifs) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [showNotifs]);
 
   const handleOpenNotifs = async () => {
@@ -48,6 +74,18 @@ export default function Navbar({ portalTitle = 'WaterWatch Platform', onToggleSi
     } catch (e) {}
   };
 
+  const handleNotificationClick = async (n) => {
+    if (!n.is_read) {
+      try {
+        await notificationService.markAsRead(n.id);
+        setNotifications((prev) =>
+          prev.map((item) => (item.id === n.id ? { ...item, is_read: true } : item))
+        );
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      } catch (e) {}
+    }
+  };
+
   return (
     <header className="top-navbar">
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -55,13 +93,15 @@ export default function Navbar({ portalTitle = 'WaterWatch Platform', onToggleSi
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', position: 'relative' }}>
-        {/* Notification Bell */}
-        <div style={{ position: 'relative' }}>
+        {/* Notification Bell & Dropdown container */}
+        <div ref={notifRef} style={{ position: 'relative' }}>
           <button
             onClick={handleOpenNotifs}
+            aria-label="View notifications"
+            aria-expanded={showNotifs}
             style={{
               position: 'relative',
-              background: '#f8fafc',
+              background: showNotifs ? '#e2e8f0' : '#f8fafc',
               border: '1px solid #e2e8f0',
               borderRadius: '50%',
               width: 38,
@@ -70,7 +110,8 @@ export default function Navbar({ portalTitle = 'WaterWatch Platform', onToggleSi
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              color: '#475569'
+              color: '#475569',
+              transition: 'all 0.15s ease'
             }}
           >
             <Bell size={18} />
@@ -105,12 +146,13 @@ export default function Navbar({ portalTitle = 'WaterWatch Platform', onToggleSi
                 position: 'absolute',
                 top: 48,
                 right: 0,
-                width: 340,
+                width: 360,
+                maxWidth: 'calc(100vw - 2rem)',
                 backgroundColor: 'white',
                 borderRadius: '12px',
-                boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15)',
+                boxShadow: '0 12px 30px -5px rgba(0,0,0,0.2), 0 0 1px 1px rgba(0,0,0,0.05)',
                 border: '1px solid #e2e8f0',
-                zIndex: 60,
+                zIndex: 1100,
                 overflow: 'hidden'
               }}
             >
@@ -123,28 +165,70 @@ export default function Navbar({ portalTitle = 'WaterWatch Platform', onToggleSi
                   justifyContent: 'space-between'
                 }}
               >
-                <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0f172a' }}>Notifications</span>
-                {unreadCount > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0f172a' }}>Notifications</span>
+                  {unreadCount > 0 && (
+                    <span
+                      style={{
+                        background: '#e0f2fe',
+                        color: '#0369a1',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        padding: '0.1rem 0.45rem',
+                        borderRadius: '9999px'
+                      }}
+                    >
+                      {unreadCount} new
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={handleMarkAllRead}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#0284c7',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        padding: '0.2rem 0.4rem',
+                        borderRadius: '4px'
+                      }}
+                      title="Mark all notifications as read"
+                    >
+                      <CheckCheck size={14} /> Mark read
+                    </button>
+                  )}
                   <button
-                    onClick={handleMarkAllRead}
+                    onClick={() => setShowNotifs(false)}
+                    aria-label="Close notifications"
+                    title="Close"
                     style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#0284c7',
-                      fontSize: '0.78rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      width: 26,
+                      height: 26,
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 4
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      color: '#64748b',
+                      transition: 'all 0.15s ease'
                     }}
                   >
-                    <CheckCheck size={14} /> Mark all read
+                    <X size={15} />
                   </button>
-                )}
+                </div>
               </div>
 
-              <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+              <div style={{ maxHeight: 340, overflowY: 'auto' }}>
                 {notifications.length === 0 ? (
                   <div style={{ padding: '2rem 1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
                     No notifications yet
@@ -153,15 +237,18 @@ export default function Navbar({ portalTitle = 'WaterWatch Platform', onToggleSi
                   notifications.map((n) => (
                     <div
                       key={n.id}
+                      onClick={() => handleNotificationClick(n)}
                       style={{
                         padding: '0.85rem 1rem',
                         borderBottom: '1px solid #f8fafc',
-                        backgroundColor: n.is_read ? 'white' : '#f0f9ff'
+                        backgroundColor: n.is_read ? 'white' : '#f0f9ff',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.15s ease'
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
                         <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e293b' }}>{n.title}</span>
-                        <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>{formatRelativeTime(n.created_at)}</span>
+                        <span style={{ fontSize: '0.72rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>{formatRelativeTime(n.created_at)}</span>
                       </div>
                       <p style={{ fontSize: '0.8rem', color: '#475569', marginTop: 4, lineHeight: 1.4 }}>
                         {n.message}
