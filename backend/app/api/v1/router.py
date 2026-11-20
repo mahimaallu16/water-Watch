@@ -1,5 +1,18 @@
 from fastapi import APIRouter
-from app.api.v1 import auth, users, reports, incidents, assignments, workers, ai, notifications, analytics, audit, feedback
+from app.api.v1 import (
+    auth,
+    users,
+    reports,
+    incidents,
+    assignments,
+    workers,
+    teams,
+    ai,
+    notifications,
+    analytics,
+    audit,
+    feedback
+)
 
 api_router = APIRouter()
 
