@@ -3,6 +3,7 @@ import { Bell, User, LogOut, CheckCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { notificationService } from '../../services/notificationService';
 import { formatRelativeTime } from '../../utils/formatters';
+import ThemeToggle from './ThemeToggle';
 
 export default function Navbar({ portalTitle = 'WaterWatch Platform', onToggleSidebar }) {
   const { user, logout } = useAuth();
@@ -54,45 +55,19 @@ export default function Navbar({ portalTitle = 'WaterWatch Platform', onToggleSi
         <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>{portalTitle}</h2>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', position: 'relative' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+        <ThemeToggle variant="segmented" />
+
         {/* Notification Bell */}
         <div style={{ position: 'relative' }}>
           <button
             onClick={handleOpenNotifs}
-            style={{
-              position: 'relative',
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '50%',
-              width: 38,
-              height: 38,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              color: '#475569'
-            }}
+            className="navbar-icon-btn"
+            title="Notifications"
           >
             <Bell size={18} />
             {unreadCount > 0 && (
-              <span
-                style={{
-                  position: 'absolute',
-                  top: -3,
-                  right: -3,
-                  background: '#ef4444',
-                  color: 'white',
-                  borderRadius: '50%',
-                  fontSize: '0.65rem',
-                  fontWeight: 700,
-                  width: 18,
-                  height: 18,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 0 0 2px white'
-                }}
-              >
+              <span className="navbar-badge">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
@@ -100,37 +75,16 @@ export default function Navbar({ portalTitle = 'WaterWatch Platform', onToggleSi
 
           {/* Notifications Dropdown */}
           {showNotifs && (
-            <div
-              style={{
-                position: 'absolute',
-                top: 48,
-                right: 0,
-                width: 340,
-                backgroundColor: 'white',
-                borderRadius: '12px',
-                boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15)',
-                border: '1px solid #e2e8f0',
-                zIndex: 60,
-                overflow: 'hidden'
-              }}
-            >
-              <div
-                style={{
-                  padding: '0.85rem 1rem',
-                  borderBottom: '1px solid #f1f5f9',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between'
-                }}
-              >
-                <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0f172a' }}>Notifications</span>
+            <div className="notifications-dropdown">
+              <div className="notifications-header">
+                <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Notifications</span>
                 {unreadCount > 0 && (
                   <button
                     onClick={handleMarkAllRead}
                     style={{
                       background: 'none',
                       border: 'none',
-                      color: '#0284c7',
+                      color: 'var(--primary-500, #0284c7)',
                       fontSize: '0.78rem',
                       fontWeight: 600,
                       cursor: 'pointer',
@@ -153,17 +107,13 @@ export default function Navbar({ portalTitle = 'WaterWatch Platform', onToggleSi
                   notifications.map((n) => (
                     <div
                       key={n.id}
-                      style={{
-                        padding: '0.85rem 1rem',
-                        borderBottom: '1px solid #f8fafc',
-                        backgroundColor: n.is_read ? 'white' : '#f0f9ff'
-                      }}
+                      className={`notification-item ${!n.is_read ? 'unread' : ''}`}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e293b' }}>{n.title}</span>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{n.title}</span>
                         <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>{formatRelativeTime(n.created_at)}</span>
                       </div>
-                      <p style={{ fontSize: '0.8rem', color: '#475569', marginTop: 4, lineHeight: 1.4 }}>
+                      <p style={{ fontSize: '0.8rem', marginTop: 4, lineHeight: 1.4, opacity: 0.85 }}>
                         {n.message}
                       </p>
                     </div>
@@ -194,26 +144,14 @@ export default function Navbar({ portalTitle = 'WaterWatch Platform', onToggleSi
           </div>
 
           <div style={{ display: 'none', flexDirection: 'column' }}>
-            <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#0f172a' }}>{user?.full_name}</span>
-            <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'capitalize' }}>{user?.role}</span>
+            <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{user?.full_name}</span>
+            <span style={{ fontSize: '0.72rem', textTransform: 'capitalize' }}>{user?.role}</span>
           </div>
 
           <button
             onClick={logout}
             title="Log Out"
-            style={{
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '8px',
-              padding: '0.45rem 0.65rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              color: '#ef4444',
-              cursor: 'pointer',
-              fontSize: '0.82rem',
-              fontWeight: 600
-            }}
+            className="navbar-logout-btn"
           >
             <LogOut size={16} />
             <span>Sign Out</span>

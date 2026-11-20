@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Droplet } from 'lucide-react';
+import ThemeToggle from '../components/common/ThemeToggle';
 
 export default function AuthLayout() {
   const { user, loading } = useAuth();
@@ -14,16 +15,20 @@ export default function AuthLayout() {
 
   return (
     <div
+      className="auth-layout-container"
       style={{
         minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#f8fafc',
-        padding: '2rem 1rem'
+        padding: '2rem 1rem',
+        position: 'relative'
       }}
     >
+      <div style={{ position: 'absolute', top: '1.25rem', right: '1.5rem', zIndex: 10 }}>
+        <ThemeToggle variant="segmented" />
+      </div>
       <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
         <div
           style={{
