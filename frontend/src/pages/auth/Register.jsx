@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { ZONES } from '../../utils/constants';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -11,10 +10,7 @@ export default function Register() {
     phone: '',
     password: '',
     role: 'citizen',
-    address: '',
-    department: 'Water Operations',
-    zone: 'Central',
-    specialization: 'General Plumbing'
+    address: ''
   });
   const [submitting, setSubmitting] = useState(false);
   const { register, login } = useAuth();
@@ -30,12 +26,17 @@ export default function Register() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await register(formData);
+      await register({
+        full_name: formData.full_name.trim(),
+        email: formData.email.trim().toLowerCase(),
+        phone: formData.phone.trim() || null,
+        password: formData.password,
+        role: 'citizen',
+        address: formData.address.trim() || null
+      });
       showToast('Registration successful! Logging you in...', 'success');
-      const user = await login(formData.email, formData.password);
-      if (user.role === 'admin') navigate('/admin');
-      else if (user.role === 'worker') navigate('/worker');
-      else navigate('/citizen');
+      await login(formData.email, formData.password);
+      navigate('/citizen');
     } catch (err) {
       showToast(err.message || 'Registration failed', 'error');
     } finally {
@@ -46,26 +47,13 @@ export default function Register() {
   return (
     <div>
       <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.4rem' }}>
-        Create Account
+        Resident Registration
       </h2>
       <p style={{ fontSize: '0.88rem', color: '#64748b', marginBottom: '1.5rem' }}>
-        Join your neighborhood water infrastructure network
+        Join your community water monitoring network to report leaks and track repairs
       </p>
 
       <form onSubmit={handleRegister}>
-        <div className="form-group">
-          <label>Account Type / Role</label>
-          <select
-            name="role"
-            className="form-control"
-            value={formData.role}
-            onChange={handleChange}
-          >
-            <option value="citizen">Resident / Citizen</option>
-            <option value="worker">Field Maintenance Technician</option>
-          </select>
-        </div>
-
         <div className="form-group">
           <label>Full Name</label>
           <input
@@ -85,7 +73,7 @@ export default function Register() {
             type="email"
             name="email"
             className="form-control"
-            placeholder="jane@example.com"
+            placeholder="e.g. resident@example.com"
             value={formData.email}
             onChange={handleChange}
             required
@@ -98,61 +86,26 @@ export default function Register() {
             type="tel"
             name="phone"
             className="form-control"
-            placeholder="+1-555-0100"
+            placeholder="+91 98765 43210"
             value={formData.phone}
             onChange={handleChange}
           />
         </div>
 
-        {formData.role === 'citizen' && (
-          <div className="form-group">
-            <label>Residential Address / Locality</label>
-            <input
-              type="text"
-              name="address"
-              className="form-control"
-              placeholder="e.g. 124 Pine Street, Apt 3B"
-              value={formData.address}
-              onChange={handleChange}
-            />
-          </div>
-        )}
-
-        {formData.role === 'worker' && (
-          <>
-            <div className="form-group">
-              <label>Assigned Zone</label>
-              <select
-                name="zone"
-                className="form-control"
-                value={formData.zone}
-                onChange={handleChange}
-              >
-                {ZONES.map((z) => (
-                  <option key={z} value={z}>{z} Zone</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label>Specialization</label>
-              <select
-                name="specialization"
-                className="form-control"
-                value={formData.specialization}
-                onChange={handleChange}
-              >
-                <option value="Main Line Repair">Main Line Repair</option>
-                <option value="Valve Specialist">Valve Specialist</option>
-                <option value="Emergency Response">Emergency Response</option>
-                <option value="General Plumbing">General Plumbing</option>
-              </select>
-            </div>
-          </>
-        )}
+        <div className="form-group">
+          <label>Residential Address / Locality</label>
+          <input
+            type="text"
+            name="address"
+            className="form-control"
+            placeholder="e.g. 124 Pine Street, Apt 3B"
+            value={formData.address}
+            onChange={handleChange}
+          />
+        </div>
 
         <div className="form-group">
-          <label>Password</label>
+          <label>Password (Min 8 chars)</label>
           <input
             type="password"
             name="password"
@@ -161,7 +114,7 @@ export default function Register() {
             value={formData.password}
             onChange={handleChange}
             required
-            minLength={6}
+            minLength={8}
           />
         </div>
 
@@ -171,7 +124,7 @@ export default function Register() {
           style={{ width: '100%', marginTop: '0.5rem' }}
           disabled={submitting}
         >
-          {submitting ? 'Creating Account...' : 'Complete Registration'}
+          {submitting ? 'Creating Account...' : 'Complete Resident Registration'}
         </button>
       </form>
 
@@ -184,4 +137,3 @@ export default function Register() {
     </div>
   );
 }
-

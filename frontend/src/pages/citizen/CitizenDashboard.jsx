@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { PlusCircle, FileText, CheckCircle, Clock, MapPin, AlertCircle, ArrowRight } from 'lucide-react';
+import { PlusCircle, FileText, CheckCircle, Clock, MapPin, AlertCircle, ArrowRight, Navigation } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { reportService } from '../../services/reportService';
+import { useLiveLocation } from '../../hooks/useLiveLocation';
 import StatCard from '../../components/common/StatCard';
 import StatusBadge from '../../components/common/StatusBadge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
@@ -15,15 +16,21 @@ export default function CitizenDashboard() {
   const [nearbyReports, setNearbyReports] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const userLat = user?.citizen_profile?.latitude || 12.9716;
-  const userLng = user?.citizen_profile?.longitude || 77.5946;
+  // Auto-detect client live GPS location
+  const liveLocation = useLiveLocation(
+    user?.citizen_profile?.latitude || 12.9716,
+    user?.citizen_profile?.longitude || 77.5946
+  );
+
+  const effectiveLat = liveLocation.latitude;
+  const effectiveLng = liveLocation.longitude;
 
   useEffect(() => {
     async function loadDashboardData() {
       try {
         const [myReps, nearby] = await Promise.all([
           reportService.getMyReports(),
-          reportService.getNearbyReports(userLat, userLng, 5.0)
+          reportService.getNearbyReports(effectiveLat, effectiveLng, 5.0)
         ]);
         setReports(myReps || []);
         setNearbyReports(nearby || []);
@@ -34,7 +41,7 @@ export default function CitizenDashboard() {
       }
     }
     loadDashboardData();
-  }, [userLat, userLng]);
+  }, [effectiveLat, effectiveLng]);
 
   if (loading) return <LoadingSpinner text="Loading your water dashboard..." />;
 
@@ -70,6 +77,14 @@ export default function CitizenDashboard() {
           <p style={{ color: '#e0f2fe', fontSize: '0.92rem', maxWidth: '520px', marginTop: '0.3rem' }}>
             Help protect our local water resources. Report bursts, overflowing mains, or low pressure in seconds.
           </p>
+          <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', background: 'rgba(255,255,255,0.15)', padding: '4px 10px', borderRadius: '20px', width: 'fit-content' }}>
+            <Navigation size={14} />
+            <span>
+              {liveLocation.isLive
+                ? `Live GPS Active: ${effectiveLat.toFixed(4)}, ${effectiveLng.toFixed(4)} (±${liveLocation.accuracy}m)`
+                : `Detecting live GPS location...`}
+            </span>
+          </div>
         </div>
 
         <Link
@@ -124,15 +139,20 @@ export default function CitizenDashboard() {
         {/* Nearby Reports Map */}
         <div className="card">
           <div className="card-header">
-            <h3>Nearby Community Incidents</h3>
+            <div>
+              <h3>Nearby Community Incidents</h3>
+              <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                Centered on your live GPS position
+              </span>
+            </div>
             <Link to="/citizen/nearby" style={{ fontSize: '0.85rem', color: '#0284c7', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
               Full Map <ArrowRight size={14} />
             </Link>
           </div>
           <div className="card-body" style={{ padding: 0 }}>
             <NearbyReportsMap
-              userLat={userLat}
-              userLng={userLng}
+              userLat={effectiveLat}
+              userLng={effectiveLng}
               radiusKm={5.0}
               reports={nearbyReports}
               height="360px"
@@ -200,4 +220,3 @@ export default function CitizenDashboard() {
     </div>
   );
 }
-

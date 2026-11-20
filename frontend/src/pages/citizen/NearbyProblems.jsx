@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { reportService } from '../../services/reportService';
+import { useLiveLocation } from '../../hooks/useLiveLocation';
 import NearbyReportsMap from '../../components/maps/NearbyReportsMap';
 import StatusBadge from '../../components/common/StatusBadge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import { getCategoryLabel, formatDistance } from '../../utils/formatters';
-import { MapPin, Filter, AlertCircle } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { MapPin, Navigation } from 'lucide-react';
 
 export default function NearbyProblems() {
   const { user } = useAuth();
@@ -15,8 +15,13 @@ export default function NearbyProblems() {
   const [loading, setLoading] = useState(true);
   const [selectedReport, setSelectedReport] = useState(null);
 
-  const userLat = user?.citizen_profile?.latitude || 12.9716;
-  const userLng = user?.citizen_profile?.longitude || 77.5946;
+  const liveLocation = useLiveLocation(
+    user?.citizen_profile?.latitude || 12.9716,
+    user?.citizen_profile?.longitude || 77.5946
+  );
+
+  const userLat = liveLocation.latitude;
+  const userLng = liveLocation.longitude;
 
   useEffect(() => {
     async function fetchNearby() {
@@ -35,27 +40,39 @@ export default function NearbyProblems() {
 
   return (
     <div>
-      <div className="page-header">
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div className="page-title">
           <h2>Nearby Water Problems Map</h2>
-          <p>Explore reported leaks, overflow incidents, and repairs occurring in your vicinity.</p>
+          <p>Explore reported leaks, overflow incidents, and repairs occurring in your live vicinity.</p>
         </div>
 
-        {/* Radius Filter Slider */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'white', padding: '0.5rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Radius:</span>
-          <input
-            type="range"
-            min={1}
-            max={15}
-            step={0.5}
-            value={radiusKm}
-            onChange={(e) => setRadiusKm(parseFloat(e.target.value))}
-            style={{ width: '120px', cursor: 'pointer' }}
-          />
-          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0284c7', minWidth: '45px' }}>
-            {radiusKm} km
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+          {/* Live GPS Status Pill */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', padding: '0.45rem 0.85rem', borderRadius: '10px', fontWeight: 600 }}>
+            <Navigation size={14} />
+            <span>
+              {liveLocation.isLive
+                ? `Live GPS: ${userLat.toFixed(4)}, ${userLng.toFixed(4)}`
+                : `Detecting live GPS...`}
+            </span>
+          </div>
+
+          {/* Radius Filter Slider */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'white', padding: '0.45rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Radius:</span>
+            <input
+              type="range"
+              min={1}
+              max={15}
+              step={0.5}
+              value={radiusKm}
+              onChange={(e) => setRadiusKm(parseFloat(e.target.value))}
+              style={{ width: '120px', cursor: 'pointer' }}
+            />
+            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0284c7', minWidth: '45px' }}>
+              {radiusKm} km
+            </span>
+          </div>
         </div>
       </div>
 
@@ -79,10 +96,10 @@ export default function NearbyProblems() {
           </div>
           <div className="card-body" style={{ padding: 0, flex: 1, overflowY: 'auto' }}>
             {loading ? (
-              <LoadingSpinner text="Scanning area..." />
+              <LoadingSpinner text="Scanning area around live GPS..." />
             ) : reports.length === 0 ? (
               <div style={{ padding: '2rem 1rem', textAlign: 'center', color: '#94a3b8' }}>
-                <p>No water issues reported within {radiusKm} km of your location.</p>
+                <p>No water issues reported within {radiusKm} km of your live location.</p>
               </div>
             ) : (
               <div>
@@ -126,4 +143,3 @@ export default function NearbyProblems() {
     </div>
   );
 }
-

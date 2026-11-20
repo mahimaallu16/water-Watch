@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { analyticsService } from '../../services/analyticsService';
 import { incidentService } from '../../services/incidentService';
+import { useLiveLocation } from '../../hooks/useLiveLocation';
 import StatCard from '../../components/common/StatCard';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import IncidentMap from '../../components/maps/IncidentMap';
@@ -26,6 +27,7 @@ export default function AdminDashboard() {
   const [kpis, setKpis] = useState(null);
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const liveLocation = useLiveLocation(12.9716, 77.5946);
 
   useEffect(() => {
     async function loadData() {
@@ -98,11 +100,13 @@ export default function AdminDashboard() {
 
       {/* Interactive GIS Incident Map */}
       <div className="card" style={{ marginBottom: '2rem' }}>
-        <div className="card-header">
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
           <div>
             <h3>Geospatial Incident & Problem Distribution</h3>
             <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-              Color-coded by severity: Red = Critical (P1), Orange = High (P2), Yellow = Medium (P3), Blue = Low (P4)
+              {liveLocation.isLive
+                ? `📍 Command Post Live GPS: ${liveLocation.latitude.toFixed(4)}, ${liveLocation.longitude.toFixed(4)} • Centered on live location`
+                : `Color-coded by severity: Red = Critical (P1), Orange = High (P2), Yellow = Medium (P3), Blue = Low (P4)`}
             </span>
           </div>
           <Link to="/admin/map" style={{ fontSize: '0.85rem', color: '#0284c7', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -113,6 +117,7 @@ export default function AdminDashboard() {
           <IncidentMap
             items={incidents}
             itemType="incident"
+            userLocation={[liveLocation.latitude, liveLocation.longitude]}
             height="420px"
           />
         </div>

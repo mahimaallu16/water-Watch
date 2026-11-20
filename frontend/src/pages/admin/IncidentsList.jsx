@@ -7,6 +7,7 @@ import PriorityBadge from '../../components/common/PriorityBadge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import Modal from '../../components/common/Modal';
 import { useToast } from '../../context/ToastContext';
+import { useLiveLocation } from '../../hooks/useLiveLocation';
 import { formatDate } from '../../utils/formatters';
 import { ZONES } from '../../utils/constants';
 
@@ -17,6 +18,7 @@ export default function IncidentsList() {
   const [severityFilter, setSeverityFilter] = useState('');
   const [zoneFilter, setZoneFilter] = useState('');
   const [search, setSearch] = useState('');
+  const liveLocation = useLiveLocation(12.9716, 77.5946);
 
   // Create Modal
   const [showModal, setShowModal] = useState(false);
@@ -60,8 +62,8 @@ export default function IncidentsList() {
         description: newDesc,
         severity: newSeverity,
         priority: newPriority,
-        latitude: 12.9716,
-        longitude: 77.5946,
+        latitude: liveLocation.latitude,
+        longitude: liveLocation.longitude,
         address_text: newAddress,
         zone: newZone
       });

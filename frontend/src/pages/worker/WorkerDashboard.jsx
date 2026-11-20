@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Wrench, CheckCircle, Clock, AlertTriangle, MapPin, ArrowRight } from 'lucide-react';
 import { workerService } from '../../services/workerService';
+import { useLiveLocation } from '../../hooks/useLiveLocation';
 import StatCard from '../../components/common/StatCard';
 import StatusBadge from '../../components/common/StatusBadge';
 import PriorityBadge from '../../components/common/PriorityBadge';
@@ -13,6 +14,7 @@ export default function WorkerDashboard() {
   const [assignments, setAssignments] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const liveLocation = useLiveLocation(12.9716, 77.5946);
 
   useEffect(() => {
     async function loadData() {
@@ -93,16 +95,21 @@ export default function WorkerDashboard() {
 
       {/* Map of Active Assignments */}
       <div className="card" style={{ marginBottom: '2rem' }}>
-        <div className="card-header">
-          <h3>Active Job Locations Map</h3>
-          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-            Click pin to view incident address and coordinates
-          </span>
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <h3>Active Job Locations Map</h3>
+            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+              {liveLocation.isLive
+                ? `📍 Technician Live GPS: ${liveLocation.latitude.toFixed(4)}, ${liveLocation.longitude.toFixed(4)}`
+                : `Click pin to view incident address and coordinates`}
+            </span>
+          </div>
         </div>
         <div className="card-body" style={{ padding: 0 }}>
           <IncidentMap
             items={mapIncidents}
             itemType="incident"
+            userLocation={[liveLocation.latitude, liveLocation.longitude]}
             height="380px"
           />
         </div>
