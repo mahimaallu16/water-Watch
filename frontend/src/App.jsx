@@ -12,6 +12,7 @@ import WorkerLayout from './layouts/WorkerLayout';
 // Auth Pages
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
+import ForgotPassword from './pages/auth/ForgotPassword';
 
 // Citizen Pages
 import CitizenDashboard from './pages/citizen/CitizenDashboard';
@@ -61,6 +62,7 @@ export default function App() {
             <Route element={<AuthLayout />}>
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
             </Route>
 
             {/* Citizen Portal */}

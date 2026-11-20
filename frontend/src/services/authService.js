@@ -35,6 +35,19 @@ export const authService = {
 
   async updateProfile(profileData) {
     return api.put('/users/profile', profileData);
+  },
+
+  async forgotPassword(email) {
+    return api.post('/auth/forgot-password', { email });
+  },
+
+  async resetPassword({ token, new_password, confirm_password, email }) {
+    return api.post('/auth/reset-password', {
+      token,
+      new_password,
+      confirm_password,
+      email
+    });
   }
 };
 

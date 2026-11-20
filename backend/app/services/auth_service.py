@@ -3,7 +3,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from app.models.user import User, CitizenProfile, WorkerProfile, Role
 from app.schemas.user import UserRegister, UserLogin, Token
-from app.core.security import hash_password, verify_password, create_access_token
+from app.core.security import hash_password, verify_password, create_access_token, create_password_reset_token, decode_password_reset_token
 from app.core.exceptions import BadRequestException, UnauthorizedException, ConflictException, ForbiddenException
 from app.services.audit_service import audit_service
 from app.repositories.user_repository import user_repository
@@ -96,5 +96,109 @@ class AuthService:
             user_id=user.id
         )
         return {"message": "Successfully logged out. Client token invalidated.", "status": "logged_out"}
+
+    @staticmethod
+    def request_password_reset(db: Session, email: str) -> dict:
+        clean_email = (email or "").strip().lower()
+        if not clean_email:
+            raise BadRequestException("Email address is required.")
+
+        user = user_repository.get_by_email(db, clean_email)
+        if not user:
+            raise BadRequestException(f"No account found with email '{clean_email}'.")
+
+        user_role = (user.role or "").lower()
+        if user_role not in ("citizen", "resident"):
+            raise ForbiddenException(
+                "Self-service password recovery is exclusively available for Citizen/Resident accounts. "
+                "Field workers and administrators must contact their municipal supervisor."
+            )
+
+        if not user.is_active:
+            raise BadRequestException("This account is currently inactive. Please contact municipal support.")
+
+        reset_token = create_password_reset_token(email=user.email, user_id=user.id, expires_minutes=15)
+        # Generate a human-readable 6-digit verification code
+        reset_code = f"{(abs(hash(user.id + user.email + datetime.now(timezone.utc).strftime('%Y%m%d%H'))) % 900000 + 100000):06d}"
+
+        audit_service.log_action(
+            db=db,
+            action="PASSWORD_RESET_REQUESTED",
+            entity_type="user",
+            entity_id=user.id,
+            user_id=user.id,
+            new_values={"email": user.email}
+        )
+
+        return {
+            "message": f"Password reset instructions generated for {user.email}. Set your new password within 15 minutes.",
+            "reset_token": reset_token,
+            "reset_code": reset_code,
+            "expires_in_minutes": 15
+        }
+
+    @staticmethod
+    def reset_password(
+        db: Session,
+        token: str,
+        new_password: str,
+        confirm_password: str,
+        email: Optional[str] = None
+    ) -> dict:
+        if not token or not token.strip():
+            raise BadRequestException("Password reset token is required.")
+
+        if not new_password or len(new_password) < 8:
+            raise BadRequestException("New password must be at least 8 characters long for security.")
+
+        if new_password != confirm_password:
+            raise BadRequestException("New password and confirm password do not match.")
+
+        payload = decode_password_reset_token(token.strip())
+        if not payload:
+            raise UnauthorizedException("Password reset token is invalid or has expired. Please request a new one.")
+
+        user_id = payload.get("sub")
+        user = user_repository.get(db, user_id)
+        if not user:
+            raise BadRequestException("User associated with this reset token could not be found.")
+
+        user_role = (user.role or "").lower()
+        if user_role not in ("citizen", "resident"):
+            raise ForbiddenException("Self-service password reset is only permitted for Citizens/Residents.")
+
+        if not user.is_active:
+            raise BadRequestException("Account is currently inactive. Please contact support.")
+
+        user.password_hash = hash_password(new_password)
+        db.commit()
+        db.refresh(user)
+
+        audit_service.log_action(
+            db=db,
+            action="PASSWORD_RESET_COMPLETED",
+            entity_type="user",
+            entity_id=user.id,
+            user_id=user.id,
+            new_values={"email": user.email}
+        )
+
+        try:
+            from app.services.notification_service import notification_service
+            notification_service.create_notification(
+                db=db,
+                user_id=user.id,
+                title="Password Successfully Updated",
+                message="Your WaterWatch account password was recently changed. If you did not make this change, contact municipal operations immediately.",
+                type="security"
+            )
+        except Exception:
+            pass
+
+        return {
+            "message": "Your password has been successfully reset. You may now log in with your new credentials.",
+            "success": True
+        }
+
 
 auth_service = AuthService()

@@ -222,9 +222,19 @@ export default function Login() {
         </div>
 
         <div className="form-group">
-          <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
-            Password
-          </label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+            <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155', margin: 0 }}>
+              Password
+            </label>
+            {selectedRole === 'citizen' && (
+              <Link
+                to="/forgot-password"
+                style={{ fontSize: '0.78rem', color: '#0284c7', fontWeight: 600, textDecoration: 'none' }}
+              >
+                Forgot Password?
+              </Link>
+            )}
+          </div>
           <div style={{ position: 'relative' }}>
             <input
               type="password"
@@ -274,12 +284,19 @@ export default function Login() {
       {/* Footer Navigation */}
       <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.82rem', color: '#64748b' }}>
         {selectedRole === 'citizen' ? (
-          <>
-            {currentRole.footerNote}{' '}
-            <Link to="/register" style={{ color: '#0284c7', fontWeight: 700 }}>
-              Create an account
-            </Link>
-          </>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <div>
+              {currentRole.footerNote}{' '}
+              <Link to="/register" style={{ color: '#0284c7', fontWeight: 700 }}>
+                Create an account
+              </Link>
+            </div>
+            <div>
+              <Link to="/forgot-password" style={{ color: '#0284c7', fontSize: '0.8rem', fontWeight: 600 }}>
+                Forgot Password?
+              </Link>
+            </div>
+          </div>
         ) : (
           <span style={{ color: '#64748b', fontSize: '0.78rem' }}>
             🔒 {currentRole.footerNote}

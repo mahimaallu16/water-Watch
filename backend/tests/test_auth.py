@@ -47,3 +47,99 @@ def test_worker_authentication(db):
     token_resp = auth_service.authenticate_user(db, creds)
     assert token_resp.role == "worker"
 
+def test_citizen_forgot_password_and_reset_flow(db):
+    from app.core.exceptions import BadRequestException, ForbiddenException, UnauthorizedException
+
+    # 1. Citizen requests password reset
+    res = auth_service.request_password_reset(db, "citizen@waterwatch.org")
+    assert res["reset_token"] is not None
+    assert res["reset_code"] is not None
+    assert "instructions generated" in res["message"]
+
+    reset_token = res["reset_token"]
+
+    # 2. Reset password to new password
+    new_pw = "NewCitizenPassword2026!"
+    reset_res = auth_service.reset_password(
+        db,
+        token=reset_token,
+        new_password=new_pw,
+        confirm_password=new_pw,
+        email="citizen@waterwatch.org"
+    )
+    assert reset_res["success"] is True
+
+    # 3. Authenticate with new password succeeds
+    login_success = auth_service.authenticate_user(
+        db,
+        UserLogin(email="citizen@waterwatch.org", password=new_pw)
+    )
+    assert login_success.access_token is not None
+
+    # 4. Old password fails
+    with pytest.raises(UnauthorizedException):
+        auth_service.authenticate_user(
+            db,
+            UserLogin(email="citizen@waterwatch.org", password="OldPassword123!")
+        )
+
+    # 5. Restore original password so other test suites stay green
+    restore_res = auth_service.request_password_reset(db, "citizen@waterwatch.org")
+    auth_service.reset_password(
+        db,
+        token=restore_res["reset_token"],
+        new_password="Password123!",
+        confirm_password="Password123!"
+    )
+
+def test_worker_and_admin_cannot_use_citizen_forgot_password(db):
+    from app.core.exceptions import ForbiddenException
+
+    # Worker forbidden
+    with pytest.raises(ForbiddenException) as exc_info:
+        auth_service.request_password_reset(db, "worker@waterwatch.org")
+    assert "Citizen/Resident" in str(exc_info.value)
+
+    # Admin forbidden
+    with pytest.raises(ForbiddenException) as exc_info:
+        auth_service.request_password_reset(db, "admin@waterwatch.org")
+    assert "Citizen/Resident" in str(exc_info.value)
+
+def test_forgot_password_validation_errors(db):
+    from app.core.exceptions import BadRequestException, UnauthorizedException
+
+    # Non-existent user
+    with pytest.raises(BadRequestException):
+        auth_service.request_password_reset(db, "nonexistent_citizen_12345@example.com")
+
+    # Passwords do not match
+    valid_res = auth_service.request_password_reset(db, "citizen@waterwatch.org")
+    with pytest.raises(BadRequestException) as exc_info:
+        auth_service.reset_password(
+            db,
+            token=valid_res["reset_token"],
+            new_password="ValidPassword123!",
+            confirm_password="DifferentPassword456!"
+        )
+    assert "do not match" in str(exc_info.value)
+
+    # Password too short (<8 chars)
+    with pytest.raises(BadRequestException) as exc_info:
+        auth_service.reset_password(
+            db,
+            token=valid_res["reset_token"],
+            new_password="short",
+            confirm_password="short"
+        )
+    assert "8 characters" in str(exc_info.value)
+
+    # Invalid / forged token
+    with pytest.raises(UnauthorizedException):
+        auth_service.reset_password(
+            db,
+            token="invalid-tampered-token",
+            new_password="ValidPassword123!",
+            confirm_password="ValidPassword123!"
+        )
+
+
