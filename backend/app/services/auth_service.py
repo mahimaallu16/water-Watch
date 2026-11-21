@@ -107,17 +107,10 @@ class AuthService:
         if not user:
             raise BadRequestException(f"No account found with email '{clean_email}'.")
 
-        user_role = (user.role or "").lower()
-        if user_role not in ("citizen", "resident"):
-            raise ForbiddenException(
-                "Self-service password recovery is exclusively available for Citizen/Resident accounts. "
-                "Field workers and administrators must contact their municipal supervisor."
-            )
-
         if not user.is_active:
             raise BadRequestException("This account is currently inactive. Please contact municipal support.")
 
-        reset_token = create_password_reset_token(email=user.email, user_id=user.id, expires_minutes=15)
+        reset_token = create_password_reset_token(email=user.email, user_id=user.id, role=user.role, expires_minutes=15)
         # Generate a human-readable 6-digit verification code
         reset_code = f"{(abs(hash(user.id + user.email + datetime.now(timezone.utc).strftime('%Y%m%d%H'))) % 900000 + 100000):06d}"
 
@@ -127,13 +120,14 @@ class AuthService:
             entity_type="user",
             entity_id=user.id,
             user_id=user.id,
-            new_values={"email": user.email}
+            new_values={"email": user.email, "role": user.role}
         )
 
         return {
             "message": f"Password reset instructions generated for {user.email}. Set your new password within 15 minutes.",
             "reset_token": reset_token,
             "reset_code": reset_code,
+            "role": user.role,
             "expires_in_minutes": 15
         }
 
@@ -163,10 +157,6 @@ class AuthService:
         if not user:
             raise BadRequestException("User associated with this reset token could not be found.")
 
-        user_role = (user.role or "").lower()
-        if user_role not in ("citizen", "resident"):
-            raise ForbiddenException("Self-service password reset is only permitted for Citizens/Residents.")
-
         if not user.is_active:
             raise BadRequestException("Account is currently inactive. Please contact support.")
 
@@ -180,7 +170,7 @@ class AuthService:
             entity_type="user",
             entity_id=user.id,
             user_id=user.id,
-            new_values={"email": user.email}
+            new_values={"email": user.email, "role": user.role}
         )
 
         try:
@@ -197,6 +187,7 @@ class AuthService:
 
         return {
             "message": "Your password has been successfully reset. You may now log in with your new credentials.",
+            "role": user.role,
             "success": True
         }
 

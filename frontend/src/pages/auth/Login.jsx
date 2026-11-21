@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { Lock, Mail, ArrowRight, Droplet, Wrench, ShieldCheck, Info } from 'lucide-react';
 
 export default function Login() {
-  const [selectedRole, setSelectedRole] = useState('citizen'); // 'citizen', 'worker', 'admin'
+  const location = useLocation();
+  const searchRole = new URLSearchParams(location.search).get('role') || location.state?.role;
+  const initialRole = ['citizen', 'worker', 'admin'].includes(searchRole) ? searchRole : 'citizen';
+  const [selectedRole, setSelectedRole] = useState(initialRole);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -226,14 +229,12 @@ export default function Login() {
             <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155', margin: 0 }}>
               Password
             </label>
-            {selectedRole === 'citizen' && (
-              <Link
-                to="/forgot-password"
-                style={{ fontSize: '0.78rem', color: '#0284c7', fontWeight: 600, textDecoration: 'none' }}
-              >
-                Forgot Password?
-              </Link>
-            )}
+            <Link
+              to={`/forgot-password?role=${selectedRole}`}
+              style={{ fontSize: '0.78rem', color: currentRole.color, fontWeight: 600, textDecoration: 'none' }}
+            >
+              Forgot Password?
+            </Link>
           </div>
           <div style={{ position: 'relative' }}>
             <input
@@ -292,15 +293,22 @@ export default function Login() {
               </Link>
             </div>
             <div>
-              <Link to="/forgot-password" style={{ color: '#0284c7', fontSize: '0.8rem', fontWeight: 600 }}>
+              <Link to="/forgot-password?role=citizen" style={{ color: '#0284c7', fontSize: '0.8rem', fontWeight: 600 }}>
                 Forgot Password?
               </Link>
             </div>
           </div>
         ) : (
-          <span style={{ color: '#64748b', fontSize: '0.78rem' }}>
-            🔒 {currentRole.footerNote}
-          </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <span style={{ color: '#64748b', fontSize: '0.78rem' }}>
+              🔒 {currentRole.footerNote}
+            </span>
+            <div>
+              <Link to={`/forgot-password?role=${selectedRole}`} style={{ color: currentRole.color, fontSize: '0.8rem', fontWeight: 600 }}>
+                Forgot Password? Reset it here
+              </Link>
+            </div>
+          </div>
         )}
       </div>
     </div>

@@ -76,7 +76,7 @@ def decode_access_token(token: str) -> Optional[dict]:
     except jwt.PyJWTError:
         return None
 
-def create_password_reset_token(email: str, user_id: str, expires_minutes: int = 15) -> str:
+def create_password_reset_token(email: str, user_id: str, role: str = "citizen", expires_minutes: int = 15) -> str:
     """
     Creates a time-limited, signed token specifically for password reset operations.
     """
@@ -84,6 +84,7 @@ def create_password_reset_token(email: str, user_id: str, expires_minutes: int =
     to_encode = {
         "sub": str(user_id),
         "email": str(email).lower(),
+        "role": str(role).lower(),
         "type": "password_reset",
         "exp": expire,
         "iat": datetime.now(timezone.utc)

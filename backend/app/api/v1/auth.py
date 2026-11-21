@@ -23,12 +23,12 @@ def login(creds: UserLogin, db: Session = Depends(get_db)):
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
 def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
-    """Request a password reset token for a citizen resident account."""
+    """Request a password reset token for any registered user (Resident, Field Worker, or Administrator)."""
     return auth_service.request_password_reset(db, req.email)
 
 @router.post("/reset-password", response_model=MessageResponse)
 def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
-    """Reset citizen password using the issued reset token."""
+    """Reset user password using the issued reset token."""
     result = auth_service.reset_password(
         db,
         token=req.token,
@@ -36,7 +36,7 @@ def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
         confirm_password=req.confirm_password,
         email=req.email
     )
-    return MessageResponse(message=result["message"], success=True)
+    return MessageResponse(message=result["message"], success=True, data={"role": result.get("role")})
 
 
 @router.post("/logout", response_model=dict)

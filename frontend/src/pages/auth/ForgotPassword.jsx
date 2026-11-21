@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
 import { authService } from '../../services/authService';
-import { Mail, Lock, ArrowRight, ArrowLeft, KeyRound, CheckCircle2, Droplet, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, ArrowRight, ArrowLeft, KeyRound, CheckCircle2, Droplet, Wrench, ShieldCheck } from 'lucide-react';
 
 export default function ForgotPassword() {
+  const [searchParams] = useSearchParams();
+  const queryRole = searchParams.get('role');
+  const initialRole = ['citizen', 'worker', 'admin'].includes(queryRole) ? queryRole : 'citizen';
+
+  const [activeRole, setActiveRole] = useState(initialRole);
   const [step, setStep] = useState(1); // 1: Request, 2: Reset Form, 3: Completed
   const [email, setEmail] = useState('');
   const [resetToken, setResetToken] = useState('');
@@ -16,10 +21,40 @@ export default function ForgotPassword() {
   const { showToast } = useToast();
   const navigate = useNavigate();
 
+  const roleMeta = {
+    citizen: {
+      title: 'Resident',
+      color: '#0284c7',
+      bgLight: '#f0f9ff',
+      borderColor: '#bae6fd',
+      textColor: '#0369a1',
+      icon: Droplet
+    },
+    worker: {
+      title: 'Field Worker',
+      color: '#16a34a',
+      bgLight: '#f0fdf4',
+      borderColor: '#bbf7d0',
+      textColor: '#166534',
+      icon: Wrench
+    },
+    admin: {
+      title: 'Administrator',
+      color: '#7c3aed',
+      bgLight: '#faf5ff',
+      borderColor: '#e9d5ff',
+      textColor: '#6b21a8',
+      icon: ShieldCheck
+    }
+  };
+
+  const currentTheme = roleMeta[activeRole] || roleMeta.citizen;
+  const RoleIcon = currentTheme.icon;
+
   const handleRequestReset = async (e) => {
     e.preventDefault();
     if (!email.trim()) {
-      showToast('Please enter your registered resident email address.', 'warning');
+      showToast('Please enter your registered email address.', 'warning');
       return;
     }
 
@@ -28,10 +63,13 @@ export default function ForgotPassword() {
       const res = await authService.forgotPassword(email.trim().toLowerCase());
       setResetToken(res.reset_token || '');
       setResetCode(res.reset_code || '');
+      if (res.role && roleMeta[res.role]) {
+        setActiveRole(res.role);
+      }
       showToast(res.message || 'Password reset instructions generated.', 'success');
       setStep(2);
     } catch (err) {
-      showToast(err.message || 'Failed to request password reset. Please check your email.', 'error');
+      showToast(err.message || 'Failed to request password reset. Please verify your email.', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -77,48 +115,93 @@ export default function ForgotPassword() {
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                width: 30,
-                height: 30,
+                width: 32,
+                height: 32,
                 borderRadius: '8px',
-                background: '#e0f2fe',
-                color: '#0284c7'
+                background: currentTheme.bgLight,
+                color: currentTheme.color,
+                border: `1px solid ${currentTheme.borderColor}`
               }}
             >
-              <Droplet size={17} />
+              <RoleIcon size={18} />
             </span>
             <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a' }}>
-              Citizen Password Recovery
+              Account Password Recovery
             </h2>
           </div>
           <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1.25rem' }}>
-            Enter your registered Resident email address to receive secure password reset instructions.
+            Enter your registered email address to receive secure password reset instructions.
           </p>
+
+          {/* Role Filter Tabs (Optional shortcut) */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr 1fr',
+              gap: '6px',
+              marginBottom: '1rem',
+              background: '#f1f5f9',
+              padding: '4px',
+              borderRadius: '10px'
+            }}
+          >
+            {Object.entries(roleMeta).map(([roleKey, meta]) => {
+              const Icon = meta.icon;
+              const isSelected = activeRole === roleKey;
+              return (
+                <button
+                  key={roleKey}
+                  type="button"
+                  onClick={() => setActiveRole(roleKey)}
+                  style={{
+                    padding: '6px 4px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    borderRadius: '7px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    background: isSelected ? '#ffffff' : 'transparent',
+                    color: isSelected ? meta.color : '#64748b',
+                    boxShadow: isSelected ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <Icon size={13} />
+                  <span>{meta.title}</span>
+                </button>
+              );
+            })}
+          </div>
 
           <div
             style={{
-              background: '#f0f9ff',
-              border: '1px solid #bae6fd',
+              background: currentTheme.bgLight,
+              border: `1px solid ${currentTheme.borderColor}`,
               borderRadius: '10px',
               padding: '0.65rem 0.85rem',
               marginBottom: '1.25rem',
               fontSize: '0.78rem',
-              color: '#0369a1',
+              color: currentTheme.textColor,
               lineHeight: 1.45
             }}
           >
-            <b>Resident Self-Service:</b> Password recovery is exclusively available for Community Resident accounts. Field Workers and Municipal Admins must contact operational headquarters.
+            <b>{currentTheme.title} Recovery:</b> Password reset is available for Community Residents, Field Maintenance Workers, and Administrators.
           </div>
 
           <form onSubmit={handleRequestReset}>
             <div className="form-group">
               <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
-                Resident Email Address
+                {currentTheme.title} Email Address
               </label>
               <div style={{ position: 'relative' }}>
                 <input
                   type="email"
                   className="form-control"
-                  placeholder="e.g. resident@example.com"
+                  placeholder={`Enter registered ${currentTheme.title.toLowerCase()} email`}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -135,7 +218,7 @@ export default function ForgotPassword() {
               style={{
                 width: '100%',
                 marginTop: '0.5rem',
-                backgroundColor: '#0284c7',
+                backgroundColor: currentTheme.color,
                 color: '#ffffff',
                 display: 'flex',
                 alignItems: 'center',
@@ -160,7 +243,10 @@ export default function ForgotPassword() {
           </form>
 
           <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.82rem', color: '#64748b' }}>
-            <Link to="/login" style={{ color: '#0284c7', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <Link
+              to={`/login?role=${activeRole}`}
+              style={{ color: currentTheme.color, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+            >
               <ArrowLeft size={14} /> Back to Sign In
             </Link>
           </div>
@@ -176,11 +262,12 @@ export default function ForgotPassword() {
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                width: 30,
-                height: 30,
+                width: 32,
+                height: 32,
                 borderRadius: '8px',
-                background: '#dcfce7',
-                color: '#16a34a'
+                background: currentTheme.bgLight,
+                color: currentTheme.color,
+                border: `1px solid ${currentTheme.borderColor}`
               }}
             >
               <KeyRound size={17} />
@@ -190,7 +277,7 @@ export default function ForgotPassword() {
             </h2>
           </div>
           <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1.25rem' }}>
-            Resetting password for <b>{email}</b>
+            Resetting password for <b>{email}</b> ({currentTheme.title})
           </p>
 
           <div
@@ -209,21 +296,22 @@ export default function ForgotPassword() {
               <div style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>
                 Verification Code
               </div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0284c7', letterSpacing: '2px' }}>
+              <div style={{ fontSize: '1.1rem', fontWeight: 800, color: currentTheme.color, letterSpacing: '2px' }}>
                 {resetCode || 'VERIFIED'}
               </div>
             </div>
             <span
               style={{
                 fontSize: '0.72rem',
-                color: '#16a34a',
-                background: '#dcfce7',
+                color: currentTheme.textColor,
+                background: currentTheme.bgLight,
+                border: `1px solid ${currentTheme.borderColor}`,
                 padding: '3px 8px',
                 borderRadius: '6px',
                 fontWeight: 700
               }}
             >
-              Valid for 15m
+              {currentTheme.title} Portal
             </span>
           </div>
 
@@ -271,7 +359,7 @@ export default function ForgotPassword() {
               style={{
                 width: '100%',
                 marginTop: '0.5rem',
-                backgroundColor: '#16a34a',
+                backgroundColor: currentTheme.color,
                 color: '#ffffff',
                 display: 'flex',
                 alignItems: 'center',
@@ -285,7 +373,7 @@ export default function ForgotPassword() {
               }}
               disabled={submitting}
             >
-              {submitting ? 'Updating Password...' : 'Save New Password & Sign In'}
+              {submitting ? 'Updating Password...' : `Save New Password & Sign In as ${currentTheme.title}`}
             </button>
           </form>
 
@@ -309,8 +397,9 @@ export default function ForgotPassword() {
               width: 56,
               height: 56,
               borderRadius: '50%',
-              backgroundColor: '#dcfce7',
-              color: '#16a34a',
+              backgroundColor: currentTheme.bgLight,
+              color: currentTheme.color,
+              border: `1px solid ${currentTheme.borderColor}`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -324,16 +413,16 @@ export default function ForgotPassword() {
             Password Reset Successful!
           </h2>
           <p style={{ fontSize: '0.88rem', color: '#64748b', marginBottom: '1.75rem', lineHeight: 1.5 }}>
-            Your account password has been updated. You can now use your new credentials to sign in to the Resident Portal.
+            Your <b>{currentTheme.title}</b> account password has been updated. You can now use your new credentials to sign in.
           </p>
 
           <button
             type="button"
             className="btn"
-            onClick={() => navigate('/login')}
+            onClick={() => navigate(`/login?role=${activeRole}`, { state: { role: activeRole } })}
             style={{
               width: '100%',
-              backgroundColor: '#0284c7',
+              backgroundColor: currentTheme.color,
               color: '#ffffff',
               display: 'flex',
               alignItems: 'center',
@@ -346,7 +435,7 @@ export default function ForgotPassword() {
               cursor: 'pointer'
             }}
           >
-            Proceed to Sign In <ArrowRight size={16} />
+            Proceed to {currentTheme.title} Sign In <ArrowRight size={16} />
           </button>
         </div>
       )}

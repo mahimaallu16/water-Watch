@@ -92,18 +92,66 @@ def test_citizen_forgot_password_and_reset_flow(db):
         confirm_password="Password123!"
     )
 
-def test_worker_and_admin_cannot_use_citizen_forgot_password(db):
-    from app.core.exceptions import ForbiddenException
+def test_worker_and_admin_forgot_password_and_reset_flow(db):
+    # 1. Field Worker password reset flow
+    w_res = auth_service.request_password_reset(db, "worker@waterwatch.org")
+    assert w_res["reset_token"] is not None
+    assert w_res["role"] == "worker"
 
-    # Worker forbidden
-    with pytest.raises(ForbiddenException) as exc_info:
-        auth_service.request_password_reset(db, "worker@waterwatch.org")
-    assert "Citizen/Resident" in str(exc_info.value)
+    new_worker_pw = "NewWorkerPassword2026!"
+    w_reset = auth_service.reset_password(
+        db,
+        token=w_res["reset_token"],
+        new_password=new_worker_pw,
+        confirm_password=new_worker_pw
+    )
+    assert w_reset["success"] is True
 
-    # Admin forbidden
-    with pytest.raises(ForbiddenException) as exc_info:
-        auth_service.request_password_reset(db, "admin@waterwatch.org")
-    assert "Citizen/Resident" in str(exc_info.value)
+    # Worker can log in with new password
+    w_auth = auth_service.authenticate_user(
+        db,
+        UserLogin(email="worker@waterwatch.org", password=new_worker_pw)
+    )
+    assert w_auth.role == "worker"
+
+    # Restore worker password
+    w_restore = auth_service.request_password_reset(db, "worker@waterwatch.org")
+    auth_service.reset_password(
+        db,
+        token=w_restore["reset_token"],
+        new_password="Password123!",
+        confirm_password="Password123!"
+    )
+
+    # 2. Administrator password reset flow
+    a_res = auth_service.request_password_reset(db, "admin@waterwatch.org")
+    assert a_res["reset_token"] is not None
+    assert a_res["role"] == "admin"
+
+    new_admin_pw = "NewAdminPassword2026!"
+    a_reset = auth_service.reset_password(
+        db,
+        token=a_res["reset_token"],
+        new_password=new_admin_pw,
+        confirm_password=new_admin_pw
+    )
+    assert a_reset["success"] is True
+
+    # Admin can log in with new password
+    a_auth = auth_service.authenticate_user(
+        db,
+        UserLogin(email="admin@waterwatch.org", password=new_admin_pw)
+    )
+    assert a_auth.role == "admin"
+
+    # Restore admin password
+    a_restore = auth_service.request_password_reset(db, "admin@waterwatch.org")
+    auth_service.reset_password(
+        db,
+        token=a_restore["reset_token"],
+        new_password="Password123!",
+        confirm_password="Password123!"
+    )
 
 def test_forgot_password_validation_errors(db):
     from app.core.exceptions import BadRequestException, UnauthorizedException

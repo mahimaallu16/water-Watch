@@ -31,6 +31,7 @@ class ForgotPasswordResponse(BaseModel):
     message: str
     reset_token: Optional[str] = None
     reset_code: Optional[str] = None
+    role: Optional[str] = None
     expires_in_minutes: int = 15
 
 class ResetPasswordRequest(BaseModel):
