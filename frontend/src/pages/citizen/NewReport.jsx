@@ -4,15 +4,18 @@ import { Camera, MapPin, AlertCircle, Upload, CheckCircle2, X } from 'lucide-rea
 import { reportService } from '../../services/reportService';
 import { useToast } from '../../context/ToastContext';
 import LocationPicker from '../../components/maps/LocationPicker';
-import { PROBLEM_CATEGORIES, FLOW_RATES } from '../../utils/constants';
+import { PROBLEM_CATEGORIES, FLOW_RATES, COMMON_PROBLEMS } from '../../utils/constants';
 
 export default function NewReport() {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('pipe_leak');
-  const [description, setDescription] = useState('');
+  const defaultProblem = COMMON_PROBLEMS[0];
+  const [category, setCategory] = useState(defaultProblem.category);
+  const [selectedProblemId, setSelectedProblemId] = useState(defaultProblem.id);
+  const [title, setTitle] = useState(defaultProblem.defaultTitle);
+  const [selectedDescIndex, setSelectedDescIndex] = useState(0);
+  const [description, setDescription] = useState(defaultProblem.descriptions[0]);
   const [estimatedFlow, setEstimatedFlow] = useState('moderate_stream');
   const [affectedHouseholds, setAffectedHouseholds] = useState(1);
   const [latitude, setLatitude] = useState(12.9716);
@@ -22,6 +25,46 @@ export default function NewReport() {
   const [selectedImages, setSelectedImages] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+
+  const handleCategoryChange = (newCat) => {
+    setCategory(newCat);
+    const available = COMMON_PROBLEMS.filter((p) => p.category === newCat);
+    if (available.length > 0) {
+      const first = available[0];
+      setSelectedProblemId(first.id);
+      setTitle(first.defaultTitle);
+      setSelectedDescIndex(0);
+      setDescription(first.descriptions[0] || '');
+    }
+  };
+
+  const handleProblemChange = (problemId) => {
+    setSelectedProblemId(problemId);
+    const prob = COMMON_PROBLEMS.find((p) => p.id === problemId);
+    if (!prob) return;
+    if (prob.category !== category) {
+      setCategory(prob.category);
+    }
+    setTitle(prob.defaultTitle);
+    setSelectedDescIndex(0);
+    setDescription(prob.descriptions[0] || '');
+  };
+
+  const handleDescTemplateChange = (val) => {
+    if (val === 'custom') {
+      setSelectedDescIndex('custom');
+    } else {
+      const idx = parseInt(val, 10);
+      setSelectedDescIndex(idx);
+      const prob = COMMON_PROBLEMS.find((p) => p.id === selectedProblemId);
+      if (prob && prob.descriptions[idx]) {
+        setDescription(prob.descriptions[idx]);
+      }
+    }
+  };
+
+  const currentProblem = COMMON_PROBLEMS.find((p) => p.id === selectedProblemId) || defaultProblem;
+  const categoryProblems = COMMON_PROBLEMS.filter((p) => p.category === category);
 
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
@@ -104,25 +147,13 @@ export default function NewReport() {
             1. Problem Category & Description
           </h3>
 
-          <div className="form-group">
-            <label>Report Title *</label>
-            <input
-              type="text"
-              className="form-control"
-              placeholder="e.g. Broken water pipeline leaking onto road"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
-            <div className="form-group">
-              <label>Suspected Issue Type *</label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Problem Category (Drop Menu) *</label>
               <select
                 className="form-control"
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                onChange={(e) => handleCategoryChange(e.target.value)}
               >
                 {PROBLEM_CATEGORIES.map((cat) => (
                   <option key={cat.value} value={cat.value}>
@@ -132,7 +163,7 @@ export default function NewReport() {
               </select>
             </div>
 
-            <div className="form-group">
+            <div className="form-group" style={{ marginBottom: 0 }}>
               <label>Estimated Flow / Leak Intensity</label>
               <select
                 className="form-control"
@@ -149,11 +180,59 @@ export default function NewReport() {
           </div>
 
           <div className="form-group">
+            <label>Specific Problem (Drop Menu) *</label>
+            <select
+              className="form-control"
+              value={selectedProblemId}
+              onChange={(e) => handleProblemChange(e.target.value)}
+            >
+              {categoryProblems.map((prob) => (
+                <option key={prob.id} value={prob.id}>
+                  {prob.label}
+                </option>
+              ))}
+            </select>
+            <span style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px', display: 'block' }}>
+              Selecting a problem automatically fills in the report title and description below.
+            </span>
+          </div>
+
+          {currentProblem && currentProblem.descriptions && currentProblem.descriptions.length > 1 && (
+            <div className="form-group">
+              <label>Problem Description Template (Drop Menu) *</label>
+              <select
+                className="form-control"
+                value={selectedDescIndex}
+                onChange={(e) => handleDescTemplateChange(e.target.value)}
+              >
+                {currentProblem.descriptions.map((desc, idx) => (
+                  <option key={idx} value={idx}>
+                    {desc}
+                  </option>
+                ))}
+                <option value="custom">-- Custom Description --</option>
+              </select>
+            </div>
+          )}
+
+          <div className="form-group">
+            <label>Report Title *</label>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="e.g. Broken water pipeline leaking onto road"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="form-group">
             <label>Detailed Description *</label>
             <textarea
               className="form-control"
               rows={3}
-              placeholder="Describe what you see: is water bubbling from pavement, overflowing a drainage ditch, discolored, or hissing from a valve box?"
+              placeholder="Describe what you see..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               required

@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { ThemeProvider } from './context/ThemeContext';
 
 // Layouts
 import AuthLayout from './layouts/AuthLayout';
@@ -50,9 +51,10 @@ function RootRedirect() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <BrowserRouter>
+    <ThemeProvider>
+      <AuthProvider>
+        <ToastProvider>
+          <BrowserRouter>
           <Routes>
             {/* Root Redirect */}
             <Route path="/" element={<RootRedirect />} />
@@ -101,6 +103,7 @@ export default function App() {
         </BrowserRouter>
       </ToastProvider>
     </AuthProvider>
+  </ThemeProvider>
   );
 }
 
